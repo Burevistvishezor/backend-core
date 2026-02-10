@@ -1,1 +1,8 @@
 
+bank-sqlite/
+├── CMakeLists.txt
+├── README.md
+└── src
+    ├── main.cpp
+    ├── Database.h
+    └── Database.cpp
