@@ -20,3 +20,4 @@ Create accounts
 Store data in SQLite
 
 List stored accounts
+Entwicklung eines fehlertoleranten Backend-Systems zur Simulation von Bankprozessen (Zinsabgrenzung, Einlagenlogik, Steuerbuchhaltung) unter Anwendung der Clean Architecture-Prinzipien.
