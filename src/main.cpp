@@ -294,3 +294,138 @@ int main() {
         return 1;
     }
 }
+#include "Database.h"
+
+#include <cstdio>
+#include <iostream>
+#include <string>
+
+Database::Database(const std::string& filename) : db_(nullptr) {
+    const int rc = sqlite3_open(filename.c_str(), &db_);
+    if (rc != SQLITE_OK) {
+        std::string error = "Failed to open database: ";
+        error += sqlite3_errmsg(db_);
+        sqlite3_close(db_);
+        db_ = nullptr;
+        throw DatabaseException(error);
+    }
+}
+
+Database::~Database() {
+    if (db_ != nullptr) {
+        sqlite3_close(db_);
+        db_ = nullptr;
+    }
+}
+
+std::string Database::trim(const std::string& text) {
+    const std::string whitespace = " \t\n\r";
+
+    const std::size_t first = text.find_first_not_of(whitespace);
+    if (first == std::string::npos) {
+        return "";
+    }
+
+    const std::size_t last = text.find_last_not_of(whitespace);
+    return text.substr(first, last - first + 1);
+}
+
+void Database::checkError(int rc, const std::string& context) const {
+    if (rc != SQLITE_OK && rc != SQLITE_ROW && rc != SQLITE_DONE) {
+        const std::string error = context + ": " + sqlite3_errmsg(db_);
+        throw DatabaseException(error);
+    }
+}
+
+void Database::init() {
+    constexpr const char* sql =
+        "CREATE TABLE IF NOT EXISTS accounts ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "owner TEXT NOT NULL,"
+        "balance REAL NOT NULL CHECK(balance >= 0),"
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);";
+
+    char* error_message = nullptr;
+    const int rc = sqlite3_exec(db_, sql, nullptr, nullptr, &error_message);
+
+    if (rc != SQLITE_OK) {
+        std::string error = "Table creation failed: ";
+        if (error_message != nullptr) {
+            error += error_message;
+            sqlite3_free(error_message);
+        }
+        throw DatabaseException(error);
+    }
+}
+
+void Database::addAccount(const std::string& owner, double balance) {
+    const std::string trimmed_owner = trim(owner);
+    if (trimmed_owner.empty()) {
+        throw std::invalid_argument("Owner name cannot be empty");
+    }
+
+    if (balance < 0.0) {
+        throw std::invalid_argument("Initial balance cannot be negative");
+    }
+
+    constexpr const char* sql =
+        "INSERT INTO accounts (owner, balance) VALUES (?, ?);";
+
+    sqlite3_stmt* stmt = nullptr;
+    int rc = sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+    checkError(rc, "Failed to prepare insert statement");
+
+    rc = sqlite3_bind_text(stmt, 1, trimmed_owner.c_str(), -1, SQLITE_TRANSIENT);
+    checkError(rc, "Failed to bind owner name");
+
+    rc = sqlite3_bind_double(stmt, 2, balance);
+    checkError(rc, "Failed to bind balance");
+
+    rc = sqlite3_step(stmt);
+    if (rc != SQLITE_DONE) {
+        sqlite3_finalize(stmt);
+        throw DatabaseException("Insert failed: " + std::string(sqlite3_errmsg(db_)));
+    }
+
+    sqlite3_finalize(stmt);
+    std::cout << "✓ Account created successfully for " << trimmed_owner
+              << " with balance: $" << balance << std::endl;
+}
+
+void Database::listAccounts() const {
+    constexpr const char* sql =
+        "SELECT id, owner, balance, created_at FROM accounts ORDER BY id;";
+
+    sqlite3_stmt* stmt = nullptr;
+    const int rc = sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        throw DatabaseException(std::string("Query failed: ") + sqlite3_errmsg(db_));
+    }
+
+    bool has_records = false;
+    std::cout << "\n" << std::string(78, '=') << std::endl;
+    std::cout << "| ID | Owner                | Balance      | Created At          |" << std::endl;
+    std::cout << std::string(78, '=') << std::endl;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        has_records = true;
+
+        const int id = sqlite3_column_int(stmt, 0);
+        const unsigned char* owner = sqlite3_column_text(stmt, 1);
+        const double balance = sqlite3_column_double(stmt, 2);
+        const unsigned char* created = sqlite3_column_text(stmt, 3);
+
+        std::printf("| %-2d | %-20s | $%-11.2f | %-19s |\n",
+                    id,
+                    reinterpret_cast<const char*>(owner),
+                    balance,
+                    reinterpret_cast<const char*>(created));
+    }
+
+    std::cout << std::string(78, '=') << std::endl;
+    if (!has_records) {
+        std::cout << "No accounts found." << std::endl;
+    }
+
+    sqlite3_finalize(stmt);
+}
