@@ -1,0 +1,59 @@
+# Build directories
+build/
+cmake-build-*/
+out/
+bin/
+lib/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Makefile
+cmake_install.cmake
+CTestTestfile.cmake
+install_manifest.txt
+compile_commands.json
+CPackConfig.cmake
+CPackSourceConfig.cmake
+
+# Compiled object files
+*.o
+*.obj
+*.lo
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+
+# Core dumps / logs
+core
+*.core
+*.log
+
+# IDE / editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# SQLite database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Coverage / test artifacts
+coverage/
+*.gcno
+*.gcda
+*.profraw
